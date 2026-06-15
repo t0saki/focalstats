@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>focalstats report</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --fg: #1c2128; --muted: #6b7280;
+    --border: #e5e7eb; --grid: #d1d5db; --accent: #2563eb; --accent-2: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --card: #161b22; --fg: #e6edf3; --muted: #8b949e;
+      --border: #30363d; --grid: #30363d; --accent: #58a6ff; --accent-2: #79c0ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  .muted { color: var(--muted); }
+  .sub { margin: 0 0 20px; font-size: 13px; }
+  .sub code { background: var(--card); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .card .num { font-size: 22px; font-weight: 600; }
+  .card .lbl { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; }
+  .panel h2 { margin: 0 0 12px; font-size: 16px; }
+  .panel h3 { margin: 14px 0 4px; font-size: 13px; font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid2 .panel { margin-bottom: 0; }
+  .grid2 + .grid2 { margin-top: 18px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  svg.chart { display: block; }
+  svg.chart .bar { fill: var(--accent); }
+  svg.chart .bar:hover { fill: var(--accent-2); }
+  svg.chart .axis { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .tick { fill: var(--muted); font-size: 11px; }
+  svg.chart .val { fill: var(--muted); font-size: 10px; }
+  svg.chart .rlabel { fill: var(--fg); font-size: 12px; }
+  svg.chart .cell { stroke: var(--card); stroke-width: 1; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 28px; }
+  @media (max-width: 720px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>focalstats — focal-length usage</h1>
+    <p class="sub muted">
+      {{if .Title}}<code>{{.Title}}</code> · {{end}}basis: {{.Basis}}{{if .DateRange}} · {{.DateRange}}{{end}} · generated {{.Generated}}
+    </p>
+  </header>
+
+  <section class="cards">
+    <div class="card"><div class="num">{{.Total}}</div><div class="lbl">scanned</div></div>
+    <div class="card"><div class="num">{{.WithFocal}}</div><div class="lbl">with focal</div></div>
+    <div class="card"><div class="num">{{.WithDate}}</div><div class="lbl">with date</div></div>
+    <div class="card"><div class="num">{{.NoFocal}}</div><div class="lbl">no focal</div></div>
+    <div class="card"><div class="num">{{.Failed}}</div><div class="lbl">failed</div></div>
+  </section>
+
+  {{if .FocalChart}}
+  <section class="panel">
+    <h2>Focal-length distribution ({{.Basis}}, mm)</h2>
+    <div class="scroll">{{.FocalChart}}</div>
+    {{if .FocalTable}}
+    <table>
+      <thead><tr><th>focal (mm)</th><th>count</th><th>share</th></tr></thead>
+      <tbody>
+        {{range .FocalTable}}<tr><td>{{.FocalMM}}</td><td>{{.Count}}</td><td>{{printf "%.1f%%" .Percent}}</td></tr>{{end}}
+      </tbody>
+    </table>
+    {{end}}
+  </section>
+  {{end}}
+
+  {{if .Heatmap}}
+  <section class="panel">
+    <h2>Focal length × year</h2>
+    <p class="muted" style="margin:0 0 8px;font-size:12px;">Top focal lengths over time — darker means more photos.</p>
+    <div class="scroll">{{.Heatmap}}</div>
+  </section>
+  {{end}}
+
+  {{if .CamCompare}}
+  <section class="panel">
+    <h2>Focal length per camera body</h2>
+    <p class="muted" style="margin:0 0 8px;font-size:12px;">Compare how focal-length habits differ across bodies / phone models.</p>
+    {{range .CamCompare}}
+      <h3>{{.Name}} <span class="muted">({{.Count}})</span></h3>
+      <div class="scroll">{{.Chart}}</div>
+    {{end}}
+  </section>
+  {{end}}
+
+  <div class="grid2">
+    {{if .HourChart}}<div class="panel"><h2>By hour of day</h2><div class="scroll">{{.HourChart}}</div></div>{{end}}
+    {{if .WeekChart}}<div class="panel"><h2>By weekday</h2><div class="scroll">{{.WeekChart}}</div></div>{{end}}
+  </div>
+
+  {{if or .YearChart .MonthChart}}
+  <div class="grid2">
+    {{if .YearChart}}<div class="panel"><h2>By year</h2><div class="scroll">{{.YearChart}}</div></div>{{end}}
+    {{if .MonthChart}}<div class="panel"><h2>Monthly timeline</h2><div class="scroll">{{.MonthChart}}</div></div>{{end}}
+  </div>
+  {{end}}
+
+  {{if or .CameraChart .LensChart}}
+  <div class="grid2">
+    {{if .CameraChart}}<div class="panel"><h2>Camera bodies</h2>{{.CameraChart}}</div>{{end}}
+    {{if .LensChart}}<div class="panel"><h2>Lenses</h2>{{.LensChart}}</div>{{end}}
+  </div>
+  {{end}}
+
+  {{if or .ApChart (or .ISOChart .ShutChart)}}
+  <section class="panel">
+    <h2>Exposure settings</h2>
+    {{if .ApChart}}<h3>Aperture</h3><div class="scroll">{{.ApChart}}</div>{{end}}
+    {{if .ISOChart}}<h3>ISO</h3><div class="scroll">{{.ISOChart}}</div>{{end}}
+    {{if .ShutChart}}<h3>Shutter speed (most used)</h3>{{.ShutChart}}{{end}}
+  </section>
+  {{end}}
+
+  <footer>Generated by focalstats · self-contained offline report</footer>
+</main>
+</body>
+</html>

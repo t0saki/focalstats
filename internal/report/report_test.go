@@ -8,18 +8,20 @@ import (
 	"github.com/t0saki/focalstats/internal/scan"
 )
 
-func sampleResult() scan.Result {
-	return scan.Result{
-		Counts:    map[int]int{35: 40, 24: 10, 50: 50},
+func sampleStats() scan.Stats {
+	return scan.Stats{
+		Basis:     scan.Basis35mm,
+		Round:     1,
 		Total:     110,
 		WithFocal: 100,
 		NoFocal:   6,
 		Failed:    4,
+		Focal:     map[int]int{35: 40, 24: 10, 50: 50},
 	}
 }
 
 func TestBuildSortsAscendingAndComputesPercent(t *testing.T) {
-	s := Build(sampleResult(), "等效35mm", 0)
+	s := Build(sampleStats(), 0)
 
 	if got := len(s.Entries); got != 3 {
 		t.Fatalf("entries = %d, want 3", got)
@@ -30,43 +32,30 @@ func TestBuildSortsAscendingAndComputesPercent(t *testing.T) {
 			t.Errorf("entry[%d].FocalMM = %d, want %d", i, e.FocalMM, wantMM[i])
 		}
 	}
-	// 50mm: 50/100 = 50%
 	if got := s.Entries[2].Percent; got != 50.0 {
 		t.Errorf("50mm percent = %v, want 50", got)
 	}
 	if s.WithFocal != 100 || s.NoFocal != 6 || s.Failed != 4 || s.Total != 110 {
 		t.Errorf("summary counters mismatch: %+v", s)
 	}
+	if s.Basis != "35mm-equivalent" {
+		t.Errorf("basis label = %q", s.Basis)
+	}
 }
 
 func TestBuildTopN(t *testing.T) {
-	s := Build(sampleResult(), "等效35mm", 2)
+	s := Build(sampleStats(), 2)
 	if got := len(s.Entries); got != 2 {
 		t.Fatalf("entries = %d, want 2 (top-2)", got)
 	}
-	// Top-2 by count are 50 (50) and 35 (40); presented ascending.
 	if s.Entries[0].FocalMM != 35 || s.Entries[1].FocalMM != 50 {
 		t.Errorf("top-2 entries = %d,%d; want 35,50", s.Entries[0].FocalMM, s.Entries[1].FocalMM)
 	}
 }
 
-func TestBuildEmpty(t *testing.T) {
-	s := Build(scan.Result{Counts: map[int]int{}}, "等效35mm", 0)
-	if len(s.Entries) != 0 {
-		t.Fatalf("entries = %d, want 0", len(s.Entries))
-	}
-	var buf bytes.Buffer
-	if err := RenderTable(&buf, s); err != nil {
-		t.Fatalf("RenderTable: %v", err)
-	}
-	if !strings.Contains(buf.String(), "未找到") {
-		t.Errorf("empty table missing notice, got:\n%s", buf.String())
-	}
-}
-
 func TestRenderCSV(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderCSV(&buf, Build(sampleResult(), "等效35mm", 0)); err != nil {
+	if err := RenderCSV(&buf, Build(sampleStats(), 0)); err != nil {
 		t.Fatalf("RenderCSV: %v", err)
 	}
 	out := buf.String()
@@ -80,13 +69,23 @@ func TestRenderCSV(t *testing.T) {
 
 func TestRenderJSON(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderJSON(&buf, Build(sampleResult(), "等效35mm", 0)); err != nil {
+	if err := RenderJSON(&buf, Build(sampleStats(), 0)); err != nil {
 		t.Fatalf("RenderJSON: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{`"basis": "等效35mm"`, `"with_focal": 100`, `"focal_mm": 24`} {
+	for _, want := range []string{`"basis": "35mm-equivalent"`, `"with_focal": 100`, `"focal_mm": 24`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("JSON missing %q, got:\n%s", want, out)
 		}
+	}
+}
+
+func TestRenderTableEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderTable(&buf, Build(scan.Stats{Basis: scan.Basis35mm, Focal: map[int]int{}}, 0)); err != nil {
+		t.Fatalf("RenderTable: %v", err)
+	}
+	if !strings.Contains(buf.String(), "no images") {
+		t.Errorf("empty table missing notice, got:\n%s", buf.String())
 	}
 }

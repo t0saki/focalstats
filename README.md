@@ -1,75 +1,96 @@
 # focalstats
 
-给定一个目录，**高效、低资源占用**地统计其中照片的**焦段使用分布**——摄影师常用来分析自己最常用的焦段、辅助选购镜头。
+English | [简体中文](README.zh-CN.md)
 
-- 只读 EXIF 元数据，**从不解码整图**（基于 [`evanoberholster/imagemeta`](https://github.com/evanoberholster/imagemeta)），CPU/内存占用低且与图片尺寸无关。
-- 并发遍历（worker 池 = CPU 核数），数十万张图片秒级完成。
-- 单次运行：给路径 → 输出统计 → 退出。
-- 支持 **JPEG / HEIC / TIFF** 与常见 **RAW**（DNG/CR2/CR3/NEF/ARW/RW2/RAF/ORF…）。
-- 多架构 Docker 镜像（`linux/amd64` + `linux/arm64`），发布在 GHCR。
+Point it at a directory and it tells you, **efficiently and with low resource usage**, which focal lengths you shoot most — handy for understanding your habits and picking your next lens.
 
-## Docker（推荐）
+- Reads **EXIF metadata only**, never decoding the full image (via [`evanoberholster/imagemeta`](https://github.com/evanoberholster/imagemeta)), so CPU/memory stay low and independent of image size.
+- Concurrent traversal (worker pool = CPU count); hundreds of thousands of photos in seconds.
+- Single run: point at a path → print stats → exit.
+- Supports **JPEG / HEIC / TIFF** and common **RAW** (DNG/CR2/CR3/NEF/ARW/RW2/RAF/ORF…).
+- Outputs a terminal table, **JSON**, **CSV**, or a self-contained **HTML report** with charts.
+- Multi-arch Docker image (`linux/amd64` + `linux/arm64`) published on GHCR.
 
-镜像：`ghcr.io/t0saki/focalstats`。将照片目录以**只读**方式挂载到容器内，把挂载点作为参数传入：
+## Docker (recommended)
+
+Image: `ghcr.io/t0saki/focalstats`. Mount your photo directory **read-only** and pass the mount point as the argument:
 
 ```bash
-docker run --rm -v /你的照片目录:/data:ro ghcr.io/t0saki/focalstats /data
+docker run --rm -v /your/photos:/data:ro ghcr.io/t0saki/focalstats /data
 
-# 机器可读输出
-docker run --rm -v /你的照片目录:/data:ro ghcr.io/t0saki/focalstats --json /data
+# JSON / CSV
+docker run --rm -v /your/photos:/data:ro ghcr.io/t0saki/focalstats --json /data
 
-# 按实际焦距、合并到 5mm 桶、只看前 10
-docker run --rm -v /你的照片目录:/data:ro ghcr.io/t0saki/focalstats \
+# HTML report — mount a writable dir and write the file into it
+docker run --rm -v /your/photos:/data:ro -v "$PWD":/out \
+  ghcr.io/t0saki/focalstats --html -o /out/report.html /data
+
+# Actual focal length, 5mm buckets, top 10
+docker run --rm -v /your/photos:/data:ro ghcr.io/t0saki/focalstats \
   --basis actual --round 5 --top 10 /data
 ```
 
-## 本地运行（需要 Go 1.23+）
+## Local (Go 1.23+)
 
 ```bash
-go run . /你的照片目录
-go build -o focalstats . && ./focalstats /你的照片目录
+go run . /your/photos
+go build -o focalstats . && ./focalstats --html -o report.html /your/photos
 ```
 
-## 用法
+## Usage
 
 ```
 focalstats [flags] <path>
 ```
 
-| Flag        | 默认    | 说明                                              |
-| ----------- | ------- | ------------------------------------------------- |
-| `--basis`   | `35mm`  | 焦段基准：`35mm`（等效35mm）或 `actual`（实际焦距）|
-| `--round`   | `1`     | 焦段分桶步长（mm）                                 |
-| `--top`     | `0`     | 只显示使用最多的前 N 个焦段（0 = 全部）            |
-| `--workers` | `0`     | 并发 worker 数（0 = CPU 核数）                     |
-| `--ext`     | 内置集  | 逗号分隔的扩展名，覆盖内置格式集（如 `jpg,heic`）  |
-| `--json`    | `false` | 输出 JSON                                         |
-| `--csv`     | `false` | 输出 CSV                                          |
+| Flag        | Default   | Description                                                       |
+| ----------- | --------- | ---------------------------------------------------------------- |
+| `--basis`   | `35mm`    | Focal basis: `35mm` (35mm-equivalent) or `actual` (true focal)   |
+| `--round`   | `1`       | Bucket rounding step, in mm                                       |
+| `--top`     | `0`       | Limit focal table & gear lists to N entries (0 = sensible default)|
+| `--workers` | `0`       | Parallel workers (0 = CPU count)                                  |
+| `--ext`     | built-in  | Comma-separated extensions overriding the built-in set           |
+| `--json`    | `false`   | Output JSON                                                       |
+| `--csv`     | `false`   | Output CSV                                                        |
+| `--html`    | `false`   | Output a self-contained HTML report                              |
+| `-o`        | stdout    | Write output to a file instead of stdout                         |
 
-统计写到 stdout，进度/错误写到 stderr，便于管道处理。
+Stats go to stdout, progress/errors to stderr, so piping works cleanly.
 
-## 示例输出
+## HTML report
+
+`--html` produces a single self-contained file (inline SVG/CSS, **no JavaScript, no external/CDN assets**, works fully offline). It includes:
+
+- Overview counters and capture date range.
+- Focal-length distribution histogram + top table.
+- **Focal length × year** heatmap (how your focal habits evolved).
+- **Focal length per camera body** — compare how different bodies / phone models differ.
+- By hour of day, weekday, year, and a monthly timeline.
+- Camera bodies and lenses (top N).
+- Exposure settings: aperture, ISO, shutter speed.
+
+## Example (terminal)
 
 ```
-focalstats — 焦段使用统计 (基准: 等效35mm)
-扫描图片: 22572  含焦段: 22572  无焦段: 0  读取失败: 0
+focalstats — focal-length usage (basis: 35mm-equivalent)
+scanned: 22572  with focal: 22572  no focal: 0  failed: 0
 
-  焦段(mm)     数量     占比  分布
-  --------  -------  -------  ----------------------------------------
-        24    10230    45.3%  ████████████████████████████████████████
-        26     2431    10.8%  █████████
-        35      984     4.4%  ███
-        70     2870    12.7%  ███████████
-        77     1983     8.8%  ███████
+  focal        count    share  distribution
+  --------  --------  -------  ----------------------------------------
+     24mm        10230    45.3%  ████████████████████████████████████████
+     26mm         2431    10.8%  █████████
+     35mm          984     4.4%  ███
+     70mm         2870    12.7%  ███████████
+     77mm         1983     8.8%  ███████
 ```
 
-## 工作原理
+## How it works
 
-1. `filepath.WalkDir` 遍历目录，按扩展名过滤候选文件。
-2. 文件路径送入带缓冲 channel，worker 池中的每个 goroutine 只读取 EXIF 头、提取焦段、累加到**私有计数表**。
-3. 所有 worker 结束后合并计数表（无锁竞争），渲染为表格 / JSON / CSV。
+1. `filepath.WalkDir` walks the tree and filters candidates by extension.
+2. Paths flow through a buffered channel; each worker goroutine reads only the EXIF header, extracts the fields, and folds them into **private histograms**.
+3. After all workers finish, the histograms are merged (no lock contention) and rendered as a table / JSON / CSV / HTML.
 
-任意时刻每个 worker 只持有一个文件、只读元数据字节，因此内存占用恒定有界，与目录规模和图片大小无关。
+Each worker holds a single open file and reads only metadata bytes at any instant, so memory stays bounded regardless of directory size or image dimensions; the aggregates are keyed by low-cardinality values (focal length, hour, camera…), so they too stay small.
 
 ## License
 
