@@ -8,7 +8,7 @@ Point it at a directory and it tells you, **efficiently and with low resource us
 - Concurrent traversal (worker pool = CPU count); hundreds of thousands of photos in seconds.
 - Single run: point at a path → print stats → exit.
 - Supports **JPEG / HEIC / TIFF** and common **RAW** (DNG/CR2/CR3/NEF/ARW/RW2/RAF/ORF…).
-- Outputs a terminal table, **JSON**, **CSV**, or a self-contained **HTML report** with charts.
+- Outputs a terminal table, **JSON**, **CSV**, or a self-contained **interactive HTML report** (filter by camera/lens/date/aperture/… and every chart recomputes in-browser).
 - Multi-arch Docker image (`linux/amd64` + `linux/arm64`) published on GHCR.
 
 ## Docker (recommended)
@@ -59,15 +59,26 @@ Stats go to stdout, progress/errors to stderr, so piping works cleanly.
 
 ## HTML report
 
-`--html` produces a single self-contained file (inline SVG/CSS, **no JavaScript, no external/CDN assets**, works fully offline). It includes:
+`--html` produces a single self-contained, **interactive** file: the per-photo
+records are embedded (gzip+base64) and a small bundled script filters and
+re-aggregates them entirely in your browser. **No external/CDN assets, no
+network — fully offline.**
 
-- Overview counters and capture date range.
+Filter by **camera body, lens, date range, hour of day, weekday, aperture, ISO,
+shutter speed**, and toggle the **focal basis** (35mm-equivalent ⇄ actual); every
+chart and table below recomputes live:
+
+- Overview counters and a "matched N / total" indicator.
 - Focal-length distribution histogram + top table.
 - **Focal length × year** heatmap (how your focal habits evolved).
 - **Focal length per camera body** — compare how different bodies / phone models differ.
 - By hour of day, weekday, year, and a monthly timeline.
-- Camera bodies and lenses (top N).
-- Exposure settings: aperture, ISO, shutter speed.
+- Camera bodies and lenses (top N); aperture, ISO, shutter-speed distributions.
+
+**File size & requirements.** The report scales with the number of photos that
+carry EXIF (≈ a few hundred KB per 100k photos after compression — e.g. ~1 MB
+for a 150k-photo library). Decompression uses the browser's built-in
+`DecompressionStream`, so open it in a recent Chrome/Edge/Firefox or Safari 16.4+.
 
 ## Example (terminal)
 

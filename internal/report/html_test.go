@@ -2,83 +2,121 @@ package report
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/t0saki/focalstats/internal/scan"
 )
 
 func richStats() scan.Stats {
-	s := scan.Stats{
-		Basis:       scan.Basis35mm,
-		Round:       1,
-		Total:       10,
-		WithFocal:   8,
-		NoFocal:     1,
-		Failed:      1,
-		WithDate:    8,
-		MinDate:     time.Date(2021, 3, 1, 9, 0, 0, 0, time.UTC),
-		MaxDate:     time.Date(2024, 7, 1, 18, 0, 0, 0, time.UTC),
-		Focal:       map[int]int{24: 5, 50: 3},
-		ByYear:      map[int]int{2021: 4, 2024: 4},
-		ByYearMonth: map[string]int{"2021-03": 4, "2024-07": 4},
-		Cameras:     map[string]int{"Acme <Cam> & Co": 6, "Phone X": 2},
-		Lenses:      map[string]int{"24-70mm F2.8": 8},
-		Apertures:   map[string]int{"f/2.8": 5, "f/8": 3},
-		ISOs:        map[int]int{100: 6, 800: 2},
-		Shutters:    map[string]int{"1/250": 5, "2s": 3},
-		FocalByYear: map[int]map[int]int{24: {2021: 3, 2024: 2}, 50: {2024: 3}},
-		FocalByCam:  map[string]map[int]int{"Acme <Cam> & Co": {24: 4, 50: 2}, "Phone X": {24: 2}},
+	return scan.Stats{
+		Basis:     scan.Basis35mm,
+		Total:     6,
+		WithFocal: 4,
+		NoFocal:   1,
+		Failed:    1,
+		WithDate:  3,
+		Records: []scan.Record{
+			{Equiv: 52, Actual: 35, Unix: 1614589200, Camera: "Acme <Cam> & Co", Lens: "24-70mm", ApX10: 28, ISO: 100, ExpUS: 4000},
+			{Equiv: 26, Actual: 9, Unix: 1614675600, Camera: "Phone X", Lens: "", ApX10: 18, ISO: 400, ExpUS: 16667},
+			{Equiv: 52, Actual: 35, Unix: 1614762000, Camera: "Acme <Cam> & Co", Lens: "24-70mm", ApX10: 80, ISO: 200, ExpUS: 2000000},
+			{Equiv: 70, Actual: 50, Camera: "Acme <Cam> & Co", Lens: "50mm", ApX10: 14, ISO: 100},
+		},
 	}
-	s.ByHour[9] = 4
-	s.ByHour[18] = 4
-	s.ByWeekday[1] = 5
-	s.ByWeekday[6] = 3
-	return s
 }
 
-func TestRenderHTML(t *testing.T) {
+// extract the base64(gzip(JSON)) payload the template embeds and decode it.
+func decodePayload(t *testing.T, html string) htmlPayload {
+	t.Helper()
+	m := regexp.MustCompile(`const RAW = "([A-Za-z0-9+/=]+)";`).FindStringSubmatch(html)
+	if m == nil {
+		t.Fatal("could not find embedded RAW payload")
+	}
+	gzBytes, err := base64.StdEncoding.DecodeString(m[1])
+	if err != nil {
+		t.Fatalf("base64 decode: %v", err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(gzBytes))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	raw, err := io.ReadAll(gz)
+	if err != nil {
+		t.Fatalf("gunzip: %v", err)
+	}
+	var p htmlPayload
+	if err := json.Unmarshal(raw, &p); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	return p
+}
+
+func TestRenderHTMLPayload(t *testing.T) {
 	var buf bytes.Buffer
 	if err := RenderHTML(&buf, richStats(), HTMLOptions{Title: "/data", Top: 0}); err != nil {
 		t.Fatalf("RenderHTML: %v", err)
 	}
-	out := buf.String()
+	html := buf.String()
 
-	for _, want := range []string{
-		"<!DOCTYPE html>",
-		"Focal-length distribution",
-		"Focal length × year",
-		"Focal length per camera body",
-		"By hour of day",
-		"By weekday",
-		"Camera bodies",
-		"Lenses",
-		"Exposure settings",
-		"<svg",
-		"2021-03-01 — 2024-07-01",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("HTML missing %q", want)
+	if !strings.Contains(html, "<!DOCTYPE html>") {
+		t.Error("not an HTML document")
+	}
+	// raw EXIF strings must never appear literally outside the compressed blob.
+	if strings.Contains(html, "Acme <Cam> & Co") {
+		t.Error("raw camera label leaked into HTML")
+	}
+	// filter UI controls present.
+	for _, id := range []string{`id="filterBody"`, `id="reset"`, `id="matched"`, "DecompressionStream"} {
+		if !strings.Contains(html, id) {
+			t.Errorf("missing UI element/feature %q", id)
 		}
 	}
 
-	// EXIF text with HTML metacharacters must be escaped, never raw.
-	if strings.Contains(out, "Acme <Cam> & Co") {
-		t.Errorf("camera label was not HTML-escaped")
+	p := decodePayload(t, html)
+	if p.Counts.Records != 4 {
+		t.Errorf("records = %d, want 4", p.Counts.Records)
 	}
-	if !strings.Contains(out, "Acme &lt;Cam&gt; &amp; Co") {
-		t.Errorf("expected escaped camera label in output")
+	if len(p.E) != 4 || len(p.T) != 4 || len(p.C) != 4 || len(p.S) != 4 {
+		t.Fatalf("columnar arrays not all length 4: %+v", p)
+	}
+	if p.Basis != "35mm" {
+		t.Errorf("basis = %q", p.Basis)
+	}
+	// dictionary-encoded camera, with the metachar name preserved in JSON (not HTML).
+	if len(p.Cams) != 2 {
+		t.Fatalf("cams = %v, want 2 entries", p.Cams)
+	}
+	if p.Cams[p.C[0]] != "Acme <Cam> & Co" {
+		t.Errorf("camera dict mismatch: %q", p.Cams[p.C[0]])
+	}
+	// fourth record has no date -> Unix 0; lens index -1 only when empty (record 2 lens empty).
+	if p.T[3] != 0 {
+		t.Errorf("record 4 should have no date, got T=%d", p.T[3])
+	}
+	if p.L[1] != -1 {
+		t.Errorf("record 2 lens should be -1 (empty), got %d", p.L[1])
+	}
+	if p.Ap[0] != 28 || p.ISO[1] != 400 || p.S[2] != 2000000 {
+		t.Errorf("columnar values mismatch: ap0=%d iso1=%d s2=%d", p.Ap[0], p.ISO[1], p.S[2])
 	}
 }
 
 func TestRenderHTMLEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	s := scan.Stats{Basis: scan.Basis35mm, Focal: map[int]int{}}
-	if err := RenderHTML(&buf, s, HTMLOptions{}); err != nil {
+	if err := RenderHTML(&buf, scan.Stats{Basis: scan.Basis35mm}, HTMLOptions{}); err != nil {
 		t.Fatalf("RenderHTML empty: %v", err)
 	}
-	if !strings.Contains(buf.String(), "<!DOCTYPE html>") {
-		t.Errorf("empty report should still be valid HTML")
+	html := buf.String()
+	if !strings.Contains(html, "<!DOCTYPE html>") {
+		t.Error("empty report should still be valid HTML")
+	}
+	p := decodePayload(t, html)
+	if p.Counts.Records != 0 || len(p.E) != 0 {
+		t.Errorf("empty payload expected, got records=%d len(e)=%d", p.Counts.Records, len(p.E))
 	}
 }

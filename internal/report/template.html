@@ -6,135 +6,579 @@
 <title>focalstats report</title>
 <style>
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --fg: #1c2128; --muted: #6b7280;
-    --border: #e5e7eb; --grid: #d1d5db; --accent: #2563eb; --accent-2: #1d4ed8;
+    --bg:#f6f7f9; --card:#fff; --fg:#1c2128; --muted:#6b7280;
+    --border:#e5e7eb; --grid:#d1d5db; --accent:#2563eb; --accent-2:#1d4ed8;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0d1117; --card: #161b22; --fg: #e6edf3; --muted: #8b949e;
-      --border: #30363d; --grid: #30363d; --accent: #58a6ff; --accent-2: #79c0ff;
+      --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --muted:#8b949e;
+      --border:#30363d; --grid:#30363d; --accent:#58a6ff; --accent-2:#79c0ff;
     }
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
-  header h1 { margin: 0 0 4px; font-size: 22px; }
-  .muted { color: var(--muted); }
-  .sub { margin: 0 0 20px; font-size: 13px; }
-  .sub code { background: var(--card); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
-  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
-  .card .num { font-size: 22px; font-weight: 600; }
-  .card .lbl { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; }
-  .panel h2 { margin: 0 0 12px; font-size: 16px; }
-  .panel h3 { margin: 14px 0 4px; font-size: 13px; font-weight: 600; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-  .grid2 .panel { margin-bottom: 0; }
-  .grid2 + .grid2 { margin-top: 18px; }
-  .scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
-  th, td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--border); }
-  th:first-child, td:first-child { text-align: left; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; }
-  svg.chart { display: block; }
-  svg.chart .bar { fill: var(--accent); }
-  svg.chart .bar:hover { fill: var(--accent-2); }
-  svg.chart .axis { stroke: var(--grid); stroke-width: 1; }
-  svg.chart .tick { fill: var(--muted); font-size: 11px; }
-  svg.chart .val { fill: var(--muted); font-size: 10px; }
-  svg.chart .rlabel { fill: var(--fg); font-size: 12px; }
-  svg.chart .cell { stroke: var(--card); stroke-width: 1; }
-  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 28px; }
-  @media (max-width: 720px) {
-    .cards { grid-template-columns: repeat(2, 1fr); }
-    .grid2 { grid-template-columns: 1fr; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  a { color:var(--accent); }
+  header { max-width:1280px; margin:0 auto; padding:20px 16px 0; }
+  header h1 { margin:0 0 4px; font-size:21px; }
+  .muted { color:var(--muted); }
+  .sub { margin:0; font-size:13px; }
+  .sub code { background:var(--card); padding:1px 6px; border-radius:4px; border:1px solid var(--border); }
+  .cards { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; max-width:1280px; margin:16px auto 0; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center; }
+  .card .num { font-size:19px; font-weight:600; }
+  .card .lbl { color:var(--muted); font-size:11px; margin-top:2px; }
+  .layout { display:grid; grid-template-columns:280px 1fr; gap:18px; max-width:1280px; margin:18px auto 64px; padding:0 16px; align-items:start; }
+  .filters { position:sticky; top:12px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; max-height:calc(100vh - 24px); overflow:auto; }
+  .filters h2 { margin:0 0 10px; font-size:15px; display:flex; justify-content:space-between; align-items:center; }
+  .matched { font-size:12px; color:var(--muted); font-weight:400; }
+  .fgroup { border-top:1px solid var(--border); padding:10px 0; }
+  .fgroup:first-of-type { border-top:none; }
+  .fgroup > label.t { display:block; font-weight:600; font-size:12px; margin-bottom:6px; }
+  .row { display:flex; gap:6px; align-items:center; }
+  .row > * { min-width:0; }
+  input[type=date], input[type=number], select {
+    background:var(--bg); color:var(--fg); border:1px solid var(--border);
+    border-radius:6px; padding:3px 6px; font:inherit; font-size:12px; width:100%; }
+  .checklist { max-height:150px; overflow:auto; border:1px solid var(--border); border-radius:6px; padding:6px; }
+  .checklist label { display:flex; gap:6px; align-items:center; font-size:12px; padding:1px 0; cursor:pointer; }
+  .checklist label span.c { margin-left:auto; color:var(--muted); }
+  .mini { font-size:11px; color:var(--accent); cursor:pointer; user-select:none; }
+  .mini:hover { text-decoration:underline; }
+  button.reset { width:100%; margin-top:10px; background:var(--accent); color:#fff; border:none;
+    border-radius:8px; padding:7px; font:inherit; font-weight:600; cursor:pointer; }
+  button.reset:hover { background:var(--accent-2); }
+  .content { min-width:0; }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+  .panel h2 { margin:0 0 10px; font-size:16px; }
+  .panel h3 { margin:12px 0 2px; font-size:13px; font-weight:600; }
+  .panel .hint { margin:0 0 8px; color:var(--muted); font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid2 .panel { margin-bottom:0; }
+  .grid2 + .grid2 { margin-top:16px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; font-variant-numeric:tabular-nums; }
+  th,td { text-align:right; padding:3px 10px; border-bottom:1px solid var(--border); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  svg.chart { display:block; }
+  svg.chart .bar { fill:var(--accent); }
+  svg.chart .bar:hover { fill:var(--accent-2); }
+  svg.chart .axis { stroke:var(--grid); stroke-width:1; }
+  svg.chart .tick { fill:var(--muted); font-size:11px; }
+  svg.chart .val { fill:var(--muted); font-size:10px; }
+  svg.chart .rlabel { fill:var(--fg); font-size:12px; }
+  svg.chart .cell { stroke:var(--card); stroke-width:1; }
+  .empty { color:var(--muted); font-size:13px; padding:8px 0; }
+  footer { color:var(--muted); font-size:12px; text-align:center; max-width:1280px; margin:0 auto; padding:0 16px 28px; }
+  @media (max-width:900px) {
+    .layout { grid-template-columns:1fr; }
+    .filters { position:static; max-height:none; }
+    .cards { grid-template-columns:repeat(3,1fr); }
+    .grid2 { grid-template-columns:1fr; }
   }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>focalstats — focal-length usage</h1>
-    <p class="sub muted">
-      {{if .Title}}<code>{{.Title}}</code> · {{end}}basis: {{.Basis}}{{if .DateRange}} · {{.DateRange}}{{end}} · generated {{.Generated}}
-    </p>
-  </header>
+<header>
+  <h1>focalstats — focal-length usage</h1>
+  <p class="sub muted" id="subtitle"></p>
+</header>
+<section class="cards" id="cards"></section>
+<div class="layout">
+  <aside class="filters">
+    <h2>Filters <span class="matched" id="matched"></span></h2>
+    <div id="filterBody"></div>
+    <button class="reset" id="reset">Reset filters</button>
+  </aside>
+  <main class="content" id="app">
+    <p class="empty">Loading…</p>
+  </main>
+</div>
+<footer>Generated by focalstats · self-contained offline report · filter to recompute every chart</footer>
 
-  <section class="cards">
-    <div class="card"><div class="num">{{.Total}}</div><div class="lbl">scanned</div></div>
-    <div class="card"><div class="num">{{.WithFocal}}</div><div class="lbl">with focal</div></div>
-    <div class="card"><div class="num">{{.WithDate}}</div><div class="lbl">with date</div></div>
-    <div class="card"><div class="num">{{.NoFocal}}</div><div class="lbl">no focal</div></div>
-    <div class="card"><div class="num">{{.Failed}}</div><div class="lbl">failed</div></div>
-  </section>
+<script>
+"use strict";
+(function () {
+  const RAW = "__DATA_B64__";
+  const SVGNS = "http://www.w3.org/2000/svg";
 
-  {{if .FocalChart}}
-  <section class="panel">
-    <h2>Focal-length distribution ({{.Basis}}, mm)</h2>
-    <div class="scroll">{{.FocalChart}}</div>
-    {{if .FocalTable}}
-    <table>
-      <thead><tr><th>focal (mm)</th><th>count</th><th>share</th></tr></thead>
-      <tbody>
-        {{range .FocalTable}}<tr><td>{{.FocalMM}}</td><td>{{.Count}}</td><td>{{printf "%.1f%%" .Percent}}</td></tr>{{end}}
-      </tbody>
-    </table>
-    {{end}}
-  </section>
-  {{end}}
+  // ---------- tiny DOM helpers ----------
+  const $ = (id) => document.getElementById(id);
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function h(tag, attrs, text) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === "class") e.className = attrs[k];
+      else if (k === "html") e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function svg(tag, attrs) {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function svgTitle(t) { const e = document.createElementNS(SVGNS, "title"); e.textContent = t; return e; }
+  function svgText(x, y, text, cls, anchor) {
+    const e = svg("text", { x, y, class: cls });
+    if (anchor) e.setAttribute("text-anchor", anchor);
+    e.textContent = text;
+    return e;
+  }
+  function empty(msg) { return h("div", { class: "empty" }, msg || "No data for this selection."); }
 
-  {{if .Heatmap}}
-  <section class="panel">
-    <h2>Focal length × year</h2>
-    <p class="muted" style="margin:0 0 8px;font-size:12px;">Top focal lengths over time — darker means more photos.</p>
-    <div class="scroll">{{.Heatmap}}</div>
-  </section>
-  {{end}}
+  // ---------- formatting ----------
+  const trim = (x) => { let s = x.toFixed(1); return s.endsWith(".0") ? s.slice(0, -2) : s; };
+  const apLabel = (apx10) => "f/" + trim(apx10 / 10);
+  const shutLabel = (us) => { const s = us / 1e6; return s >= 1 ? trim(s) + "s" : "1/" + Math.round(1 / s); };
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const dateStr = (unix) => { const d = new Date(unix * 1000); return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate()); };
 
-  {{if .CamCompare}}
-  <section class="panel">
-    <h2>Focal length per camera body</h2>
-    <p class="muted" style="margin:0 0 8px;font-size:12px;">Compare how focal-length habits differ across bodies / phone models.</p>
-    {{range .CamCompare}}
-      <h3>{{.Name}} <span class="muted">({{.Count}})</span></h3>
-      <div class="scroll">{{.Chart}}</div>
-    {{end}}
-  </section>
-  {{end}}
+  // ---------- load (gzip+base64 -> JSON) ----------
+  async function load() {
+    const bin = Uint8Array.from(atob(RAW), (c) => c.charCodeAt(0));
+    if (typeof DecompressionStream === "undefined")
+      throw new Error("This browser lacks DecompressionStream. Open the report in a recent Chrome/Edge/Firefox or Safari 16.4+.");
+    const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return JSON.parse(await new Response(stream).text());
+  }
 
-  <div class="grid2">
-    {{if .HourChart}}<div class="panel"><h2>By hour of day</h2><div class="scroll">{{.HourChart}}</div></div>{{end}}
-    {{if .WeekChart}}<div class="panel"><h2>By weekday</h2><div class="scroll">{{.WeekChart}}</div></div>{{end}}
-  </div>
+  load().then(init).catch((err) => { $("app").innerHTML = ""; $("app").appendChild(empty(err.message)); });
 
-  {{if or .YearChart .MonthChart}}
-  <div class="grid2">
-    {{if .YearChart}}<div class="panel"><h2>By year</h2><div class="scroll">{{.YearChart}}</div></div>{{end}}
-    {{if .MonthChart}}<div class="panel"><h2>Monthly timeline</h2><div class="scroll">{{.MonthChart}}</div></div>{{end}}
-  </div>
-  {{end}}
+  // ---------- state ----------
+  let D;            // parsed payload
+  let Eq, A, T, C, L, Ap, Iso, S; // columns
+  let fullMin, fullMax;           // date bounds (unix)
+  const F = {};     // live filter state
+  let basis;
 
-  {{if or .CameraChart .LensChart}}
-  <div class="grid2">
-    {{if .CameraChart}}<div class="panel"><h2>Camera bodies</h2>{{.CameraChart}}</div>{{end}}
-    {{if .LensChart}}<div class="panel"><h2>Lenses</h2>{{.LensChart}}</div>{{end}}
-  </div>
-  {{end}}
+  function init(data) {
+    D = data;
+    Eq = D.e; A = D.a; T = D.t; C = D.c; L = D.l; Ap = D.ap; Iso = D.iso; S = D.s;
+    basis = D.basis || "35mm";
 
-  {{if or .ApChart (or .ISOChart .ShutChart)}}
-  <section class="panel">
-    <h2>Exposure settings</h2>
-    {{if .ApChart}}<h3>Aperture</h3><div class="scroll">{{.ApChart}}</div>{{end}}
-    {{if .ISOChart}}<h3>ISO</h3><div class="scroll">{{.ISOChart}}</div>{{end}}
-    {{if .ShutChart}}<h3>Shutter speed (most used)</h3>{{.ShutChart}}{{end}}
-  </section>
-  {{end}}
+    $("subtitle").innerHTML =
+      (D.title ? "<code>" + escapeHtml(D.title) + "</code> · " : "") +
+      "generated " + escapeHtml(D.generated) + " · " + D.counts.records + " photos with metadata";
+    renderCards();
 
-  <footer>Generated by focalstats · self-contained offline report</footer>
-</main>
+    // date bounds
+    fullMin = Infinity; fullMax = -Infinity;
+    for (let i = 0; i < T.length; i++) { const t = T[i]; if (t > 0) { if (t < fullMin) fullMin = t; if (t > fullMax) fullMax = t; } }
+    if (!isFinite(fullMin)) { fullMin = 0; fullMax = 0; }
+
+    buildFilters();
+    apply();
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function renderCards() {
+    const c = D.counts;
+    const cards = [
+      [c.total, "scanned"], [c.records, "with metadata"], [c.withFocal, "with focal"],
+      [c.withDate, "with date"], [c.noFocal, "no focal"], [c.failed, "failed"],
+    ];
+    const root = $("cards"); clear(root);
+    for (const [num, lbl] of cards) {
+      const card = h("div", { class: "card" });
+      card.appendChild(h("div", { class: "num" }, num.toLocaleString()));
+      card.appendChild(h("div", { class: "lbl" }, lbl));
+      root.appendChild(card);
+    }
+  }
+
+  // ---------- distinct value helpers ----------
+  function distinct(col) { const set = new Set(); for (let i = 0; i < col.length; i++) if (col[i] > 0) set.add(col[i]); return [...set]; }
+  function counted(idxCol, dictLen) { const a = new Array(dictLen).fill(0); for (let i = 0; i < idxCol.length; i++) { const v = idxCol[i]; if (v >= 0) a[v]++; } return a; }
+
+  // ---------- build filter UI ----------
+  function buildFilters() {
+    const body = $("filterBody"); clear(body);
+
+    // basis
+    F.basis = basis;
+    const gB = group("Focal basis");
+    for (const [val, lbl] of [["35mm", "35mm-equivalent"], ["actual", "actual focal length"]]) {
+      const id = "basis-" + val;
+      const lab = h("label", { class: "" });
+      const r = h("input", { type: "radio", name: "basis", id });
+      r.value = val; if (val === basis) r.checked = true;
+      r.addEventListener("change", () => { F.basis = val; apply(); });
+      lab.appendChild(r); lab.appendChild(document.createTextNode(" " + lbl));
+      lab.style.display = "block"; lab.style.fontSize = "12px";
+      gB.appendChild(lab);
+    }
+    body.appendChild(gB);
+
+    // date range
+    if (fullMax > 0) {
+      const g = group("Date range");
+      const from = h("input", { type: "date", id: "dFrom", value: dateStr(fullMin), min: dateStr(fullMin), max: dateStr(fullMax) });
+      const to = h("input", { type: "date", id: "dTo", value: dateStr(fullMax), min: dateStr(fullMin), max: dateStr(fullMax) });
+      from.addEventListener("change", apply); to.addEventListener("change", apply);
+      const row = h("div", { class: "row" }); row.appendChild(from); row.appendChild(h("span", { class: "muted" }, "→")); row.appendChild(to);
+      g.appendChild(row); body.appendChild(g);
+    }
+
+    // hour of day
+    if (fullMax > 0) {
+      const g = group("Hour of day (0–23)");
+      const lo = h("input", { type: "number", id: "hLo", min: 0, max: 23, value: 0 });
+      const hi = h("input", { type: "number", id: "hHi", min: 0, max: 23, value: 23 });
+      lo.addEventListener("change", apply); hi.addEventListener("change", apply);
+      const row = h("div", { class: "row" }); row.appendChild(lo); row.appendChild(h("span", { class: "muted" }, "–")); row.appendChild(hi);
+      g.appendChild(row); body.appendChild(g);
+    }
+
+    // weekday
+    if (fullMax > 0) {
+      const g = group("Weekday");
+      const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const order = [1, 2, 3, 4, 5, 6, 0];
+      const list = h("div", { class: "checklist" });
+      F.wday = new Set(order);
+      for (const d of order) {
+        const lab = h("label");
+        const cb = h("input", { type: "checkbox" }); cb.checked = true;
+        cb.addEventListener("change", () => { cb.checked ? F.wday.add(d) : F.wday.delete(d); apply(); });
+        lab.appendChild(cb); lab.appendChild(h("span", null, names[d]));
+        list.appendChild(lab);
+      }
+      g.appendChild(list); body.appendChild(g);
+    }
+
+    // camera & lens checklists
+    F.cam = checklist(body, "Camera body", D.cams, counted(C, D.cams.length), (set) => { F.cam = set; });
+    F.lens = checklist(body, "Lens", D.lenses, counted(L, D.lenses.length), (set) => { F.lens = set; });
+
+    // aperture / iso / shutter range selects
+    F.ap = rangeSelect(body, "Aperture", distinct(Ap).sort((a, b) => a - b), apLabel);
+    F.iso = rangeSelect(body, "ISO", distinct(Iso).sort((a, b) => a - b), (v) => String(v));
+    F.shut = rangeSelect(body, "Shutter speed", distinct(S).sort((a, b) => a - b), shutLabel);
+
+    $("reset").addEventListener("click", () => { buildFilters(); F.basis = basis; const r = $("basis-" + basis); if (r) r.checked = true; apply(); });
+  }
+
+  function group(title) {
+    const g = h("div", { class: "fgroup" });
+    g.appendChild(h("label", { class: "t" }, title));
+    return g;
+  }
+
+  // checklist returns a Set of selected dictionary indices; full set === inactive.
+  function checklist(body, title, dict, counts, onset) {
+    if (!dict.length) return null;
+    const g = group(title);
+    const order = dict.map((_, i) => i).sort((a, b) => counts[b] - counts[a]);
+    const set = new Set(order);
+    const tools = h("div", { class: "row" });
+    const all = h("span", { class: "mini" }, "all");
+    const none = h("span", { class: "mini" }, "none");
+    tools.appendChild(all); tools.appendChild(h("span", { class: "muted" }, "·")); tools.appendChild(none);
+    g.appendChild(tools);
+    const list = h("div", { class: "checklist" });
+    const boxes = [];
+    for (const i of order) {
+      const lab = h("label");
+      const cb = h("input", { type: "checkbox" }); cb.checked = true; boxes.push([cb, i]);
+      cb.addEventListener("change", () => { cb.checked ? set.add(i) : set.delete(i); apply(); });
+      lab.appendChild(cb);
+      lab.appendChild(h("span", null, dict[i] || "(unknown)"));
+      lab.appendChild(h("span", { class: "c" }, String(counts[i])));
+      list.appendChild(lab);
+    }
+    all.addEventListener("click", () => { boxes.forEach(([cb, i]) => { cb.checked = true; set.add(i); }); apply(); });
+    none.addEventListener("click", () => { boxes.forEach(([cb, i]) => { cb.checked = false; set.delete(i); }); apply(); });
+    g.appendChild(list); body.appendChild(g);
+    onset && onset(set);
+    set._len = dict.length;
+    return set;
+  }
+
+  // rangeSelect returns {vals, lo(), hi()} with min/max <select>s; full range === inactive.
+  function rangeSelect(body, title, vals, label) {
+    if (vals.length < 2) return null;
+    const g = group(title);
+    const lo = h("select"), hi = h("select");
+    vals.forEach((v) => { lo.appendChild(new Option(label(v), v)); hi.appendChild(new Option(label(v), v)); });
+    lo.selectedIndex = 0; hi.selectedIndex = vals.length - 1;
+    lo.addEventListener("change", apply); hi.addEventListener("change", apply);
+    const row = h("div", { class: "row" }); row.appendChild(lo); row.appendChild(h("span", { class: "muted" }, "–")); row.appendChild(hi);
+    g.appendChild(row); body.appendChild(g);
+    return { vals, loEl: lo, hiEl: hi };
+  }
+
+  // ---------- filtering ----------
+  function filterState() {
+    const st = { basis: F.basis };
+    const fromEl = $("dFrom"), toEl = $("dTo");
+    if (fromEl && toEl) {
+      const f = Math.floor(Date.parse(fromEl.value + "T00:00:00Z") / 1000);
+      const t = Math.floor(Date.parse(toEl.value + "T23:59:59Z") / 1000);
+      if (f > fullMin || t < fullMax) { st.dFrom = f; st.dTo = t; }
+    }
+    const hLo = $("hLo"), hHi = $("hHi");
+    if (hLo && hHi) { const a = +hLo.value, b = +hHi.value; if (a > 0 || b < 23) { st.hLo = a; st.hHi = b; } }
+    if (F.wday && F.wday.size < 7) st.wday = F.wday;
+    if (F.cam && F.cam.size < F.cam._len) st.cam = F.cam;
+    if (F.lens && F.lens.size < F.lens._len) st.lens = F.lens;
+    st.ap = rangeActive(F.ap);
+    st.iso = rangeActive(F.iso);
+    st.shut = rangeActive(F.shut);
+    return st;
+  }
+  function rangeActive(r) {
+    if (!r) return null;
+    const lo = +r.loEl.value, hi = +r.hiEl.value;
+    if (lo <= r.vals[0] && hi >= r.vals[r.vals.length - 1]) return null;
+    return [Math.min(lo, hi), Math.max(lo, hi)];
+  }
+
+  function matched(st) {
+    const idx = [];
+    const needHour = st.hLo != null, needWday = !!st.wday;
+    for (let i = 0; i < T.length; i++) {
+      if (st.dFrom != null) { const t = T[i]; if (t < st.dFrom || t > st.dTo) continue; }
+      if (needHour || needWday) {
+        const t = T[i]; if (t <= 0) continue;
+        const d = new Date(t * 1000);
+        if (needHour) { const hr = d.getUTCHours(); if (hr < st.hLo || hr > st.hHi) continue; }
+        if (needWday && !st.wday.has(d.getUTCDay())) continue;
+      }
+      if (st.cam) { const v = C[i]; if (v < 0 || !st.cam.has(v)) continue; }
+      if (st.lens) { const v = L[i]; if (v < 0 || !st.lens.has(v)) continue; }
+      if (st.ap) { const v = Ap[i]; if (v <= 0 || v < st.ap[0] || v > st.ap[1]) continue; }
+      if (st.iso) { const v = Iso[i]; if (v <= 0 || v < st.iso[0] || v > st.iso[1]) continue; }
+      if (st.shut) { const v = S[i]; if (v <= 0 || v < st.shut[0] || v > st.shut[1]) continue; }
+      idx.push(i);
+    }
+    return idx;
+  }
+
+  // ---------- aggregation ----------
+  function bump(m, k) { m.set(k, (m.get(k) || 0) + 1); }
+  function aggregate(idx, basisSel) {
+    const FC = basisSel === "actual" ? A : Eq;
+    const focal = new Map(), year = new Map(), month = new Map(),
+      cam = new Map(), lens = new Map(), ap = new Map(), iso = new Map(), shut = new Map(),
+      fByYear = new Map(), fByCam = new Map();
+    const hour = new Array(24).fill(0), wday = new Array(7).fill(0);
+    let withFocal = 0, withDate = 0;
+    for (let k = 0; k < idx.length; k++) {
+      const i = idx[k];
+      const f = FC[i];
+      if (f > 0) { bump(focal, f); withFocal++; }
+      const t = T[i];
+      if (t > 0) {
+        withDate++;
+        const d = new Date(t * 1000), y = d.getUTCFullYear();
+        hour[d.getUTCHours()]++; wday[d.getUTCDay()]++;
+        bump(year, y);
+        bump(month, y + "-" + pad2(d.getUTCMonth() + 1));
+        if (f > 0) { let ym = fByYear.get(f); if (!ym) { ym = new Map(); fByYear.set(f, ym); } bump(ym, y); }
+      }
+      const ci = C[i];
+      if (ci >= 0) { bump(cam, ci); if (f > 0) { let fm = fByCam.get(ci); if (!fm) { fm = new Map(); fByCam.set(ci, fm); } bump(fm, f); } }
+      const li = L[i]; if (li >= 0) bump(lens, li);
+      const a = Ap[i]; if (a > 0) bump(ap, a);
+      const is = Iso[i]; if (is > 0) bump(iso, is);
+      const s = S[i]; if (s > 0) bump(shut, s);
+    }
+    return { n: idx.length, withFocal, withDate, focal, hour, wday, year, month, cam, lens, ap, iso, shut, fByYear, fByCam };
+  }
+
+  // ---------- bars from maps ----------
+  function mapBarsByKeyAsc(m, label, suffix) {
+    const keys = [...m.keys()].sort((a, b) => a - b);
+    return keys.map((k) => ({ label: label(k), value: m.get(k), title: label(k) + (suffix || "") + ": " + m.get(k) }));
+  }
+  function topBars(m, dict, n) {
+    const arr = [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    return arr.map(([k, v]) => ({ label: dict ? (dict[k] || "(unknown)") : String(k), value: v, title: (dict ? dict[k] : k) + ": " + v }));
+  }
+  function focalBars(m, withFocal) {
+    const keys = [...m.keys()].sort((a, b) => a - b);
+    return keys.map((k) => { const v = m.get(k), p = withFocal ? (v / withFocal * 100).toFixed(1) : "0.0"; return { label: String(k), value: v, title: k + "mm: " + v + " (" + p + "%)" }; });
+  }
+
+  // ---------- SVG chart renderers ----------
+  function vbars(container, bars) {
+    clear(container);
+    const n = bars.length;
+    if (!n) { container.appendChild(empty()); return; }
+    let step = 36; if (n > 60) step = 9; else if (n > 24) step = 14; else if (n > 10) step = 26;
+    const barW = Math.max(3, Math.floor(step * 0.7));
+    const padTop = 16, chartH = 180, padBottom = 34, padL = 8, padR = 8;
+    let maxV = 1; for (const b of bars) if (b.value > maxV) maxV = b.value;
+    const w = padL + n * step + padR, ht = padTop + chartH + padBottom;
+    let stride = 1; while (n / stride > 16) stride++;
+    const showVal = step >= 24;
+    const s = svg("svg", { class: "chart", width: w, height: ht, viewBox: "0 0 " + w + " " + ht, role: "img" });
+    s.appendChild(svg("line", { class: "axis", x1: padL, y1: padTop + chartH, x2: w - padR, y2: padTop + chartH }));
+    bars.forEach((b, i) => {
+      const bh = Math.round(b.value * chartH / maxV);
+      const x = padL + i * step + Math.floor((step - barW) / 2);
+      const y = padTop + chartH - bh;
+      const rect = svg("rect", { class: "bar", x, y, width: barW, height: bh });
+      rect.appendChild(svgTitle(b.title));
+      s.appendChild(rect);
+      if (showVal && b.value > 0) s.appendChild(svgText(x + barW / 2, y - 3, String(b.value), "val", "middle"));
+      if (i % stride === 0) s.appendChild(svgText(padL + i * step + step / 2, padTop + chartH + 14, b.label, "tick", "middle"));
+    });
+    container.appendChild(s);
+  }
+
+  function hbars(container, bars) {
+    clear(container);
+    const n = bars.length;
+    if (!n) { container.appendChild(empty()); return; }
+    const W = 720, labelW = 220, rowH = 26, valW = 60, barMax = W - labelW - valW;
+    let maxV = 1; for (const b of bars) if (b.value > maxV) maxV = b.value;
+    const ht = n * rowH + 6;
+    const s = svg("svg", { class: "chart", width: "100%", viewBox: "0 0 " + W + " " + ht, preserveAspectRatio: "xMinYMin meet", role: "img" });
+    bars.forEach((b, i) => {
+      const y = i * rowH + 3, bw = Math.round(b.value * barMax / maxV);
+      const lab = b.label.length > 30 ? b.label.slice(0, 29) + "…" : b.label;
+      s.appendChild(svgText(labelW - 8, y + rowH / 2 + 3, lab, "rlabel", "end"));
+      const rect = svg("rect", { class: "bar", x: labelW, y, width: bw, height: rowH - 8 });
+      rect.appendChild(svgTitle(b.title)); s.appendChild(rect);
+      s.appendChild(svgText(labelW + bw + 6, y + rowH / 2 + 3, String(b.value), "val"));
+    });
+    container.appendChild(s);
+  }
+
+  function heatmap(container, fByYear) {
+    clear(container);
+    let rows = [...fByYear.keys()].map((f) => { let t = 0; for (const v of fByYear.get(f).values()) t += v; return [f, t]; });
+    if (!rows.length) { container.appendChild(empty()); return; }
+    rows.sort((a, b) => b[1] - a[1]); rows = rows.slice(0, 12).map((r) => r[0]).sort((a, b) => a - b);
+    const yset = new Set(); rows.forEach((f) => fByYear.get(f).forEach((_, y) => yset.add(y)));
+    const years = [...yset].sort((a, b) => a - b);
+    let maxC = 1; rows.forEach((f) => fByYear.get(f).forEach((v) => { if (v > maxC) maxC = v; }));
+    const cw = 30, ch = 24, leftW = 60, topH = 6, botH = 22;
+    const w = leftW + years.length * cw, ht = topH + rows.length * ch + botH;
+    const s = svg("svg", { class: "chart", width: w, height: ht, viewBox: "0 0 " + w + " " + ht, role: "img" });
+    rows.forEach((f, ri) => {
+      const y = topH + ri * ch;
+      s.appendChild(svgText(leftW - 6, y + ch / 2 + 3, f + "mm", "rlabel", "end"));
+      years.forEach((yr, ci) => {
+        const c = fByYear.get(f).get(yr) || 0, x = leftW + ci * cw;
+        const op = c > 0 ? (0.15 + 0.85 * c / maxC) : 0;
+        const rect = svg("rect", { class: "cell", x, y, width: cw - 2, height: ch - 2, fill: "var(--accent)", "fill-opacity": op.toFixed(3) });
+        rect.appendChild(svgTitle(f + "mm · " + yr + ": " + c)); s.appendChild(rect);
+      });
+    });
+    years.forEach((yr, ci) => s.appendChild(svgText(leftW + ci * cw + cw / 2, topH + rows.length * ch + 14, String(yr), "tick", "middle")));
+    container.appendChild(s);
+  }
+
+  // ---------- render everything ----------
+  function panel(title, hint) {
+    const p = h("div", { class: "panel" });
+    p.appendChild(h("h2", null, title));
+    if (hint) p.appendChild(h("p", { class: "hint" }, hint));
+    const body = h("div", { class: "scroll" });
+    p.appendChild(body);
+    return { p, body };
+  }
+
+  function render(agg) {
+    const app = $("app"); clear(app);
+    if (!agg.n) { app.appendChild(empty("No photos match the current filters.")); return; }
+    const basisLabel = F.basis === "actual" ? "actual focal length" : "35mm-equivalent";
+
+    // focal distribution + table
+    {
+      const { p, body } = panel("Focal-length distribution (" + basisLabel + ", mm)");
+      vbars(body, focalBars(agg.focal, agg.withFocal));
+      const keys = [...agg.focal.entries()].sort((a, b) => b[1] - a[1]).slice(0, D.topN).sort((a, b) => a[0] - b[0]);
+      if (keys.length) {
+        const tbl = h("table");
+        tbl.appendChild(h("thead", { html: "<tr><th>focal (mm)</th><th>count</th><th>share</th></tr>" }));
+        const tb = h("tbody");
+        for (const [mm, v] of keys) {
+          const tr = h("tr");
+          tr.appendChild(h("td", null, String(mm)));
+          tr.appendChild(h("td", null, v.toLocaleString()));
+          tr.appendChild(h("td", null, (agg.withFocal ? (v / agg.withFocal * 100).toFixed(1) : "0.0") + "%"));
+          tb.appendChild(tr);
+        }
+        tbl.appendChild(tb); p.appendChild(tbl);
+      }
+      app.appendChild(p);
+    }
+
+    // heatmap
+    if (agg.fByYear.size) { const { p, body } = panel("Focal length × year", "Top focal lengths over time — darker means more photos."); heatmap(body, agg.fByYear); app.appendChild(p); }
+
+    // per-camera comparison
+    if (agg.fByCam.size) {
+      const p = h("div", { class: "panel" });
+      p.appendChild(h("h2", null, "Focal length per camera body"));
+      p.appendChild(h("p", { class: "hint" }, "Compare how focal-length habits differ across bodies / phone models."));
+      const top = [...agg.cam.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+      for (const [ci, cnt] of top) {
+        const fm = agg.fByCam.get(ci); if (!fm) continue;
+        const head = h("h3"); head.appendChild(document.createTextNode((D.cams[ci] || "(unknown)") + " "));
+        head.appendChild(h("span", { class: "muted" }, "(" + cnt.toLocaleString() + ")"));
+        p.appendChild(head);
+        const body = h("div", { class: "scroll" });
+        let tot = 0; for (const v of fm.values()) tot += v;
+        vbars(body, focalBars(fm, tot));
+        p.appendChild(body);
+      }
+      app.appendChild(p);
+    }
+
+    // time grids
+    {
+      const g1 = h("div", { class: "grid2" });
+      const ph = panel("By hour of day"); vbars(ph.body, agg.hour.map((v, i) => ({ label: String(i), value: v, title: pad2(i) + ":00–" + pad2(i) + ":59: " + v }))); g1.appendChild(ph.p);
+      const order = [1, 2, 3, 4, 5, 6, 0], names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const pw = panel("By weekday"); vbars(pw.body, order.map((d) => ({ label: names[d], value: agg.wday[d], title: names[d] + ": " + agg.wday[d] }))); g1.appendChild(pw.p);
+      app.appendChild(g1);
+
+      const g2 = h("div", { class: "grid2" });
+      const py = panel("By year"); vbars(py.body, mapBarsByKeyAsc(agg.year, (k) => String(k))); g2.appendChild(py.p);
+      const pm = panel("Monthly timeline"); vbars(pm.body, [...agg.month.keys()].sort().map((k) => ({ label: k, value: agg.month.get(k), title: k + ": " + agg.month.get(k) }))); g2.appendChild(pm.p);
+      app.appendChild(g2);
+    }
+
+    // gear
+    {
+      const g = h("div", { class: "grid2" });
+      const pc = h("div", { class: "panel" }); pc.appendChild(h("h2", null, "Camera bodies")); hbars(pc, topBars(agg.cam, D.cams, D.topN)); g.appendChild(pc);
+      const pl = h("div", { class: "panel" }); pl.appendChild(h("h2", null, "Lenses")); hbars(pl, topBars(agg.lens, D.lenses, D.topN)); g.appendChild(pl);
+      app.appendChild(g);
+    }
+
+    // exposure
+    {
+      const p = h("div", { class: "panel" });
+      p.appendChild(h("h2", null, "Exposure settings"));
+      p.appendChild(h("h3", null, "Aperture"));
+      let b = h("div", { class: "scroll" }); vbars(b, mapBarsByKeyAsc(agg.ap, (k) => trim(k / 10), "")); p.appendChild(b);
+      p.appendChild(h("h3", null, "ISO"));
+      b = h("div", { class: "scroll" }); vbars(b, mapBarsByKeyAsc(agg.iso, (k) => String(k))); p.appendChild(b);
+      p.appendChild(h("h3", null, "Shutter speed (most used)"));
+      hbars(p, [...agg.shut.entries()].sort((a, b2) => b2[1] - a[1]).slice(0, D.topN).map(([k, v]) => ({ label: shutLabel(k), value: v, title: shutLabel(k) + ": " + v })));
+      app.appendChild(p);
+    }
+  }
+
+  // ---------- apply pipeline ----------
+  function apply() {
+    const st = filterState();
+    const idx = matched(st);
+    const agg = aggregate(idx, st.basis);
+    $("matched").textContent = idx.length.toLocaleString() + " / " + D.counts.records.toLocaleString();
+    render(agg);
+  }
+})();
+</script>
 </body>
 </html>

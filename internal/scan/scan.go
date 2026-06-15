@@ -58,6 +58,45 @@ type Options struct {
 	Basis   Basis           // which focal value to bucket by
 	Round   int             // bucket step in mm; <=0 means 1
 	Exts    map[string]bool // extension set; nil means DefaultExtSet()
+	Collect bool            // also keep a per-photo Record for each image (for the interactive HTML report)
+}
+
+// Record is a compact per-photo row kept only when Options.Collect is set. It
+// carries every field the interactive HTML report can filter on. Zero values
+// mean the corresponding tag was absent.
+type Record struct {
+	Equiv  int    // 35mm-equivalent focal length, mm
+	Actual int    // true focal length, mm
+	Unix   int64  // capture time as wall-clock interpreted in UTC (0 = none)
+	Camera string // camera body
+	Lens   string // lens model
+	ApX10  int    // f-number * 10 (e.g. 28 == f/2.8)
+	ISO    int    // ISO sensitivity
+	ExpUS  int    // exposure (shutter) time in microseconds
+}
+
+// recordOf builds a Record from a Meta, reporting false when the photo carries
+// no useful metadata at all (nothing to filter or aggregate on).
+func recordOf(m exif.Meta) (Record, bool) {
+	r := Record{
+		Equiv:  int(math.Round(m.Equiv35)),
+		Actual: int(math.Round(m.Actual)),
+		Camera: m.Camera,
+		Lens:   m.Lens,
+		ISO:    m.ISO,
+	}
+	if m.FNumber > 0 {
+		r.ApX10 = int(math.Round(m.FNumber * 10))
+	}
+	if m.Exposure > 0 {
+		r.ExpUS = int(math.Round(m.Exposure * 1e6))
+	}
+	if !m.Taken.IsZero() {
+		t := m.Taken
+		r.Unix = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC).Unix()
+	}
+	ok := r.Equiv > 0 || r.Actual > 0 || r.Unix > 0 || r.Camera != "" || r.Lens != "" || r.ApX10 > 0 || r.ISO > 0 || r.ExpUS > 0
+	return r, ok
 }
 
 // Stats is the aggregated outcome of a Scan. Every histogram counts photos.
@@ -86,6 +125,8 @@ type Stats struct {
 	Shutters    map[string]int         // "1/250" / "2s" -> count
 	FocalByYear map[int]map[int]int    // focal bucket -> year -> count (heatmap)
 	FocalByCam  map[string]map[int]int // camera -> focal bucket -> count (per-body comparison)
+
+	Records []Record // per-photo rows; populated only when Options.Collect is set
 }
 
 func newStats(basis Basis, round int) *Stats {
@@ -207,6 +248,9 @@ func (s *Stats) merge(o *Stats) {
 	if !o.MaxDate.IsZero() && (s.MaxDate.IsZero() || o.MaxDate.After(s.MaxDate)) {
 		s.MaxDate = o.MaxDate
 	}
+	if len(o.Records) > 0 {
+		s.Records = append(s.Records, o.Records...)
+	}
 }
 
 func mergeMap[K comparable](dst, src map[K]int) {
@@ -249,6 +293,11 @@ func Scan(root string, opts Options) (Stats, error) {
 					continue
 				}
 				l.add(m)
+				if opts.Collect {
+					if r, ok := recordOf(m); ok {
+						l.Records = append(l.Records, r)
+					}
+				}
 			}
 		}(locals[i])
 	}

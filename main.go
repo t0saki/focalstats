@@ -73,7 +73,7 @@ func run() int {
 		return 1
 	}
 
-	opts := scan.Options{Workers: *workers, Basis: basis, Round: *round}
+	opts := scan.Options{Workers: *workers, Basis: basis, Round: *round, Collect: *asHTML}
 	if *extsFlag != "" {
 		opts.Exts = parseExts(*extsFlag)
 	}
