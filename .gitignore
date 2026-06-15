@@ -1,0 +1,8 @@
+# Build output
+/focalstats
+/out/
+*.exe
+
+# Go
+*.test
+*.out
