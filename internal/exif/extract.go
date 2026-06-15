@@ -6,6 +6,7 @@
 package exif
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -34,12 +35,21 @@ func (m Meta) HasEquiv35() bool { return m.Equiv35 > 0 }
 
 // Extract opens path, reads only its EXIF metadata, and returns it. The file is
 // closed before returning.
-func Extract(path string) (Meta, error) {
+//
+// imagemeta can panic on certain malformed files (e.g. a truncated IFD), so the
+// decode is guarded by a recover: a bad file yields an error, never a crash that
+// would take down the whole scan.
+func Extract(path string) (m Meta, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return Meta{}, err
 	}
 	defer f.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			m, err = Meta{}, fmt.Errorf("metadata decode panicked: %v", r)
+		}
+	}()
 
 	e, err := imagemeta.Decode(f)
 	if err != nil {
